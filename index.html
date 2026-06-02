@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Visor Urbano | Municipalidad de Jesús María</title>
+    <title>Sistema de Informacion Geografica | Municipalidad de Jesús María</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body {
@@ -48,7 +48,7 @@
 </head>
 <body>
 
-    <header><h1>Visor Urbano - Municipalidad de Jesús María</h1></header>
+    <header><h1>Sistema de Informacion Geografica  - Municipalidad de Jesús María</h1></header>
     <div id="app-container"><div id="map"></div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -63,11 +63,19 @@
         const layerInmuebles = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:mapinmtodosPGM', format: 'image/png', transparent: true, version: '1.1.0' });
         const layerUsoDeSuelo = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:usos_de_suelo_ord_4196', format: 'image/png', transparent: true, version: '1.1.0' });
 
+        // AGREGAR ESTA LÍNEA:
+        const layerEjido2023 = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:ejido2023', format: 'image/png', transparent: true, version: '1.1.0' });
+        const layerBarrios = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:barriosjm1', format: 'image/png', transparent: true, version: '1.1.0' });
+        const layerManzanas = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:idecor_manzanasweb', format: 'image/png', transparent: true, version: '1.1.0' });
+
         // Control de Capas
         const capasWMS = {
             "Gestión de Calles": layerCalles,
             "Mapa de Inmuebles": layerInmuebles,
-            "Uso de Suelo": layerUsoDeSuelo
+            "Uso de Suelo": layerUsoDeSuelo,
+            "Ejido 2023": layerEjido2023, // AGREGAR ESTA LÍNEA
+            "Barrios": layerBarrios, // AGREGAR ESTA LÍNEA
+            "Manzanas": layerManzanas, // AGREGAR ESTA LÍNEA
         };
         L.control.layers(null, capasWMS, { collapsed: false, position: 'topright' }).addTo(map);
 
@@ -89,18 +97,27 @@
             const listaCapas = [
                 { nombre: "Calles", ref: layerCalles, id: 'GisJM:gestioncalleside' },
                 { nombre: "Inmuebles", ref: layerInmuebles, id: 'GisJM:mapinmtodosPGM' },
-                { nombre: "Uso de Suelo", ref: layerUsoDeSuelo, id: 'GisJM:usos_de_suelo_ord_4196' }
+                { nombre: "Uso de Suelo", ref: layerUsoDeSuelo, id: 'GisJM:usos_de_suelo_ord_4196' },
+                { nombre: "Ejido 2023", ref: layerEjido2023, id: 'GisJM:ejido2023' },
+                { nombre: "Barrios", ref: layerBarrios, id: 'GisJM:barriosjm1' },
+                { nombre: "Manzanas", ref: layerManzanas, id: 'GisJM:idecor_manzanasweb' }
             ];
 
             listaCapas.forEach(capa => {
                 if (map.hasLayer(capa.ref)) {
-                    html += `<b>${capa.nombre}</b><br><img src="${geoserverUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=${capa.id}"><br>`;
+                    html += `<b>${capa.nombre}</b><br>`;
+                    // Slider de Opacidad
+                    html += `<input type="range" min="0" max="1" step="0.1" value="${capa.ref.options.opacity || 1}" 
+                     oninput="capa.ref.setOpacity(this.value)"> Opacidad<br>`;
+                    // Imagen de leyenda
+                    html += `<img src="${geoserverUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=${capa.id}"><br><br>`;
                     activas = true;
                 }
             });
 
             div.innerHTML = activas ? html : '<h4>Leyenda</h4><p>No hay capas activas</p>';
         }
+
 
         map.on('overlayadd', actualizarLeyenda);
         map.on('overlayremove', actualizarLeyenda);
@@ -115,6 +132,9 @@
             if (map.hasLayer(layerCalles)) queryLayers.push('GisJM:gestioncalleside');
             if (map.hasLayer(layerInmuebles)) queryLayers.push('GisJM:mapinmtodosPGM');
             if (map.hasLayer(layerUsoDeSuelo)) queryLayers.push('GisJM:usos_de_suelo_ord_4196');
+            if (map.hasLayer(layerEjido2023)) queryLayers.push('GisJM:ejido2023');
+            if (map.hasLayer(layerBarrios)) queryLayers.push('GisJM:barriosjm1');
+            if (map.hasLayer(layerManzanas)) queryLayers.push('GisJM:idecor_manzanasweb');
 
             if (queryLayers.length === 0) return;
 
