@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Visor Urbano | Municipalidad de Jesús María</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            background: #003366;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        #app-container {
+            display: flex;
+            flex: 1;
+        }
+
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+
+        .legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            max-width: 250px;
+        }
+
+            .legend h4 {
+                margin: 0 0 5px;
+                color: #777;
+            }
+    </style>
+</head>
+<body>
+
+    <header><h1>Visor Urbano - Municipalidad de Jesús María</h1></header>
+    <div id="app-container"><div id="map"></div></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map', { zoomControl: true }).setView([-30.9764, -64.0957], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+
+        const geoserverUrl = 'http://192.168.0.52:8090/geoserver/GisJM/wms';
+
+        // Definición de capas SIN .addTo(map) para que inicien destildadas
+        const layerCalles = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:gestioncalleside', format: 'image/png', transparent: true, version: '1.1.0' });
+        const layerInmuebles = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:mapinmtodosPGM', format: 'image/png', transparent: true, version: '1.1.0' });
+        const layerUsoDeSuelo = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:usos_de_suelo_ord_4196', format: 'image/png', transparent: true, version: '1.1.0' });
+
+        // Control de Capas
+        const capasWMS = {
+            "Gestión de Calles": layerCalles,
+            "Mapa de Inmuebles": layerInmuebles,
+            "Uso de Suelo": layerUsoDeSuelo
+        };
+        L.control.layers(null, capasWMS, { collapsed: false, position: 'topright' }).addTo(map);
+
+        // Lógica de Leyenda Dinámica
+        const leyenda = L.control({ position: 'bottomleft' });
+        leyenda.onAdd = function () {
+            const div = L.DomUtil.create('div', 'legend');
+            div.id = 'legend-content';
+            div.innerHTML = '<h4>Leyenda</h4><p>No hay capas activas</p>';
+            return div;
+        };
+        leyenda.addTo(map);
+
+        function actualizarLeyenda() {
+            const div = document.getElementById('legend-content');
+            let html = '<h4>Leyenda</h4>';
+            let activas = false;
+
+            const listaCapas = [
+                { nombre: "Calles", ref: layerCalles, id: 'GisJM:gestioncalleside' },
+                { nombre: "Inmuebles", ref: layerInmuebles, id: 'GisJM:mapinmtodosPGM' },
+                { nombre: "Uso de Suelo", ref: layerUsoDeSuelo, id: 'GisJM:usos_de_suelo_ord_4196' }
+            ];
+
+            listaCapas.forEach(capa => {
+                if (map.hasLayer(capa.ref)) {
+                    html += `<b>${capa.nombre}</b><br><img src="${geoserverUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=${capa.id}"><br>`;
+                    activas = true;
+                }
+            });
+
+            div.innerHTML = activas ? html : '<h4>Leyenda</h4><p>No hay capas activas</p>';
+        }
+
+        map.on('overlayadd', actualizarLeyenda);
+        map.on('overlayremove', actualizarLeyenda);
+
+        // Lógica de Clic
+        map.on('click', function (e) {
+            const point = map.latLngToContainerPoint(e.latlng);
+            const size = map.getSize();
+            const bounds = map.getBounds();
+
+            let queryLayers = [];
+            if (map.hasLayer(layerCalles)) queryLayers.push('GisJM:gestioncalleside');
+            if (map.hasLayer(layerInmuebles)) queryLayers.push('GisJM:mapinmtodosPGM');
+            if (map.hasLayer(layerUsoDeSuelo)) queryLayers.push('GisJM:usos_de_suelo_ord_4196');
+
+            if (queryLayers.length === 0) return;
+
+            const params = { request: 'GetFeatureInfo', service: 'WMS', version: '1.1.0', format: 'image/png', bbox: bounds.toBBoxString(), height: size.y, width: size.x, layers: queryLayers.join(','), query_layers: queryLayers.join(','), info_format: 'application/json', x: Math.round(point.x), y: Math.round(point.y), srs: 'EPSG:4326' };
+            const url = geoserverUrl + L.Util.getParamString(params, geoserverUrl);
+
+            fetch(url).then(res => res.json()).then(data => {
+                if (data.features && data.features.length > 0) {
+                    let content = "<h4>Información</h4>";
+                    data.features.forEach(feat => {
+                        content += `<div style="border-bottom:1px solid #ccc;">`;
+                        for (let key in feat.properties) content += `<b>${key}:</b> ${feat.properties[key]}<br>`;
+                        content += `</div>`;
+                    });
+                    L.popup().setLatLng(e.latlng).setContent(content).openOn(map);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
