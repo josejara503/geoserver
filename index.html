@@ -2,9 +2,44 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Sistema de Informacion Geografica | Municipalidad de Jesús María</title>
+    <title>Sistema de Información Geográfica | Municipalidad de Jesús María</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+
+
+        #layers-panel {
+            width: 320px;
+            background: #ffffff;
+            border-right: 1px solid #ccc;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        #layer-search {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box; /* Importante para que el padding no rompa el ancho */
+            font-size: 14px;
+        }
+
+        #layer-list {
+            overflow-y: auto; /* Permite scroll si hay muchas capas */
+            flex: 1;
+        }
+
+        .layer-item {
+            background: #f9f9f9;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+
         body {
             margin: 0;
             padding: 0;
@@ -25,11 +60,31 @@
         #app-container {
             display: flex;
             flex: 1;
+            overflow: hidden;
+        }
+
+        /* Panel Lateral de Capas */
+        #layers-panel {
+            width: 300px;
+            background: #f4f4f4;
+            border-right: 1px solid #ddd;
+            padding: 15px;
+            overflow-y: auto;
+            z-index: 1000;
         }
 
         #map {
             flex: 1;
             height: 100%;
+        }
+
+        .layer-item {
+            background: white;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 0.9em;
         }
 
         .legend {
@@ -40,16 +95,29 @@
             max-width: 250px;
         }
 
-            .legend h4 {
-                margin: 0 0 5px;
-                color: #777;
-            }
+        h4 {
+            margin: 0 0 10px;
+            color: #333;
+        }
     </style>
 </head>
 <body>
 
-    <header><h1>Sistema de Informacion Geografica  - Municipalidad de Jesús María</h1></header>
-    <div id="app-container"><div id="map"></div></div>
+    >
+    <header>
+        <h1>Sistema de Información Geográfica - Municipalidad de Jesús María</h1>
+    </header>
+
+    <div id="app-container">
+        <aside id="layers-panel">
+            <h4>Capas Disponibles</h4>
+            <input type="text" id="layer-search" placeholder="🔍 Buscar capas..." onkeyup="filtrarCapas()">
+
+            <div id="layer-list"></div>
+        </aside>
+
+        <div id="map"></div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -58,101 +126,84 @@
 
         const geoserverUrl = 'http://192.168.0.52:8090/geoserver/GisJM/wms';
 
-        // Definición de capas SIN .addTo(map) para que inicien destildadas
-        const layerCalles = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:gestioncalleside', format: 'image/png', transparent: true, version: '1.1.0' });
-        const layerInmuebles = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:mapinmtodosPGM', format: 'image/png', transparent: true, version: '1.1.0' });
-        const layerUsoDeSuelo = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:usos_de_suelo_ord_4196', format: 'image/png', transparent: true, version: '1.1.0' });
+        // Definición de capas
+        const capasConfig = [
+            { id: 'GisJM:gestioncalleside', nombre: "Gestión de Calles", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:gestioncalleside', format: 'image/png', transparent: true, version: '1.1.0' }) },
+            { id: 'GisJM:mapinmtodosPGM', nombre: "Mapa de Inmuebles", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:mapinmtodosPGM', format: 'image/png', transparent: true, version: '1.1.0' }) },
+            { id: 'GisJM:usos_de_suelo_ord_4196', nombre: "Uso de Suelo", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:usos_de_suelo_ord_4196', format: 'image/png', transparent: true, version: '1.1.0' }) },
+            { id: 'GisJM:ejido2023', nombre: "Ejido 2023", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:ejido2023', format: 'image/png', transparent: true, version: '1.1.0' }) },
+            { id: 'GisJM:barriosjm1', nombre: "Barrios", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:barriosjm1', format: 'image/png', transparent: true, version: '1.1.0' }) },
+            { id: 'GisJM:idecor_manzanasweb', nombre: "Manzanas", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:idecor_manzanasweb', format: 'image/png', transparent: true, version: '1.1.0' }) }
+        ];
 
-        // AGREGAR ESTA LÍNEA:
-        const layerEjido2023 = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:ejido2023', format: 'image/png', transparent: true, version: '1.1.0' });
-        const layerBarrios = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:barriosjm1', format: 'image/png', transparent: true, version: '1.1.0' });
-        const layerManzanas = L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:idecor_manzanasweb', format: 'image/png', transparent: true, version: '1.1.0' });
+        // Renderizar Panel
+        const container = document.getElementById('layer-list');
+        capasConfig.forEach(c => {
+            const div = document.createElement('div');
+            div.className = 'layer-item';
+            div.innerHTML = `
+                            <input type="checkbox" id="${c.id}" onchange="toggleLayer('${c.id}')">
+                            <label for="${c.id}">${c.nombre}</label>
+                            <div id="controls-${c.id}" style="display:none; margin-top:5px;">
+                                <input type="range" min="0" max="1" step="0.1" value="1" oninput="c.ref.setOpacity(this.value)">
+                            </div>
+                        `;
+            container.appendChild(div);
+        });
 
-        // Control de Capas
-        const capasWMS = {
-            "Gestión de Calles": layerCalles,
-            "Mapa de Inmuebles": layerInmuebles,
-            "Uso de Suelo": layerUsoDeSuelo,
-            "Ejido 2023": layerEjido2023, // AGREGAR ESTA LÍNEA
-            "Barrios": layerBarrios, // AGREGAR ESTA LÍNEA
-            "Manzanas": layerManzanas, // AGREGAR ESTA LÍNEA
-        };
-        L.control.layers(null, capasWMS, { collapsed: false, position: 'topright' }).addTo(map);
+        function toggleLayer(id) {
+            const capa = capasConfig.find(c => c.id === id);
+            const checkbox = document.getElementById(id);
+            const controls = document.getElementById('controls-' + id);
 
-        // Lógica de Leyenda Dinámica
-        const leyenda = L.control({ position: 'bottomleft' });
-        leyenda.onAdd = function () {
-            const div = L.DomUtil.create('div', 'legend');
-            div.id = 'legend-content';
-            div.innerHTML = '<h4>Leyenda</h4><p>No hay capas activas</p>';
-            return div;
-        };
-        leyenda.addTo(map);
-
-        function actualizarLeyenda() {
-            const div = document.getElementById('legend-content');
-            let html = '<h4>Leyenda</h4>';
-            let activas = false;
-
-            const listaCapas = [
-                { nombre: "Calles", ref: layerCalles, id: 'GisJM:gestioncalleside' },
-                { nombre: "Inmuebles", ref: layerInmuebles, id: 'GisJM:mapinmtodosPGM' },
-                { nombre: "Uso de Suelo", ref: layerUsoDeSuelo, id: 'GisJM:usos_de_suelo_ord_4196' },
-                { nombre: "Ejido 2023", ref: layerEjido2023, id: 'GisJM:ejido2023' },
-                { nombre: "Barrios", ref: layerBarrios, id: 'GisJM:barriosjm1' },
-                { nombre: "Manzanas", ref: layerManzanas, id: 'GisJM:idecor_manzanasweb' }
-            ];
-
-            listaCapas.forEach(capa => {
-                if (map.hasLayer(capa.ref)) {
-                    html += `<b>${capa.nombre}</b><br>`;
-                    // Slider de Opacidad
-                    html += `<input type="range" min="0" max="1" step="0.1" value="${capa.ref.options.opacity || 1}" 
-                     oninput="capa.ref.setOpacity(this.value)"> Opacidad<br>`;
-                    // Imagen de leyenda
-                    html += `<img src="${geoserverUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=${capa.id}"><br><br>`;
-                    activas = true;
-                }
-            });
-
-            div.innerHTML = activas ? html : '<h4>Leyenda</h4><p>No hay capas activas</p>';
+            if (checkbox.checked) {
+                capa.ref.addTo(map);
+                controls.style.display = 'block';
+            } else {
+                map.removeLayer(capa.ref);
+                controls.style.display = 'none';
+            }
         }
 
-
-        map.on('overlayadd', actualizarLeyenda);
-        map.on('overlayremove', actualizarLeyenda);
-
-        // Lógica de Clic
+        // Lógica de Clic (GetFeatureInfo simplificada)
         map.on('click', function (e) {
-            const point = map.latLngToContainerPoint(e.latlng);
-            const size = map.getSize();
-            const bounds = map.getBounds();
-
-            let queryLayers = [];
-            if (map.hasLayer(layerCalles)) queryLayers.push('GisJM:gestioncalleside');
-            if (map.hasLayer(layerInmuebles)) queryLayers.push('GisJM:mapinmtodosPGM');
-            if (map.hasLayer(layerUsoDeSuelo)) queryLayers.push('GisJM:usos_de_suelo_ord_4196');
-            if (map.hasLayer(layerEjido2023)) queryLayers.push('GisJM:ejido2023');
-            if (map.hasLayer(layerBarrios)) queryLayers.push('GisJM:barriosjm1');
-            if (map.hasLayer(layerManzanas)) queryLayers.push('GisJM:idecor_manzanasweb');
-
+            let queryLayers = capasConfig.filter(c => map.hasLayer(c.ref)).map(c => c.id);
             if (queryLayers.length === 0) return;
 
-            const params = { request: 'GetFeatureInfo', service: 'WMS', version: '1.1.0', format: 'image/png', bbox: bounds.toBBoxString(), height: size.y, width: size.x, layers: queryLayers.join(','), query_layers: queryLayers.join(','), info_format: 'application/json', x: Math.round(point.x), y: Math.round(point.y), srs: 'EPSG:4326' };
-            const url = geoserverUrl + L.Util.getParamString(params, geoserverUrl);
+            const params = {
+                request: 'GetFeatureInfo', service: 'WMS', version: '1.1.0', format: 'image/png',
+                bbox: map.getBounds().toBBoxString(), height: map.getSize().y, width: map.getSize().x,
+                layers: queryLayers.join(','), query_layers: queryLayers.join(','), info_format: 'application/json',
+                x: Math.round(map.latLngToContainerPoint(e.latlng).x), y: Math.round(map.latLngToContainerPoint(e.latlng).y), srs: 'EPSG:4326'
+            };
 
-            fetch(url).then(res => res.json()).then(data => {
-                if (data.features && data.features.length > 0) {
-                    let content = "<h4>Información</h4>";
-                    data.features.forEach(feat => {
-                        content += `<div style="border-bottom:1px solid #ccc;">`;
-                        for (let key in feat.properties) content += `<b>${key}:</b> ${feat.properties[key]}<br>`;
-                        content += `</div>`;
-                    });
-                    L.popup().setLatLng(e.latlng).setContent(content).openOn(map);
+            fetch(geoserverUrl + L.Util.getParamString(params, geoserverUrl))
+                .then(res => res.json())
+                .then(data => {
+                    if (data.features?.length > 0) {
+                        let content = "<h4>Información</h4>";
+                        data.features.forEach(feat => {
+                            for (let key in feat.properties) content += `<b>${key}:</b> ${feat.properties[key]}<br>`;
+                        });
+                        L.popup().setLatLng(e.latlng).setContent(content).openOn(map);
+                    }
+                });
+        });
+
+
+        function filtrarCapas() {
+            const busqueda = document.getElementById('layer-search').value.toLowerCase();
+            const items = document.querySelectorAll('.layer-item');
+
+            items.forEach(item => {
+                const nombre = item.querySelector('label').innerText.toLowerCase();
+                if (nombre.includes(busqueda)) {
+                    item.style.display = 'block'; // Muestra si coincide
+                } else {
+                    item.style.display = 'none';  // Oculta si no coincide
                 }
             });
-        });
+        }
     </script>
 </body>
 </html>
