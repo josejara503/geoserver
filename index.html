@@ -2,38 +2,44 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Sistema de Información Geográfica | Municipalidad de Jesús María</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>SIG | Municipalidad de Jesús María</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', sans-serif;
+            font-family: sans-serif;
             display: flex;
             flex-direction: column;
             height: 100vh;
+            overflow: hidden;
         }
 
         header {
             background: #003366;
             color: white;
-            padding: 1rem 2rem;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            z-index: 1000;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1001;
         }
 
         #app-container {
             display: flex;
             flex: 1;
-            overflow: hidden;
+            position: relative;
         }
 
+        /* Panel lateral */
         #layers-panel {
-            width: 320px;
+            width: 300px;
             background: #f4f4f4;
             border-right: 1px solid #ddd;
             padding: 15px;
             overflow-y: auto;
+            transition: transform 0.3s ease;
         }
 
         #map {
@@ -41,12 +47,32 @@
             height: 100%;
         }
 
-        #layer-search {
-            width: 100%;
+        /* Estilos responsivos para móvil */
+        @media (max-width: 768px) {
+            #layers-panel {
+                position: absolute;
+                height: 100%;
+                left: -300px;
+                z-index: 1000;
+                box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+            }
+
+                #layers-panel.active {
+                    transform: translateX(300px);
+                }
+
+            #menu-btn {
+                display: block !important;
+            }
+        }
+
+        #menu-btn {
+            display: none;
+            background: white;
+            border: none;
             padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            margin-bottom: 10px;
+            cursor: pointer;
+            border-radius: 4px;
         }
 
         .layer-item {
@@ -61,25 +87,20 @@
             display: block;
             margin-top: 8px;
             max-width: 100%;
-            border: 1px solid #eee;
-        }
-
-        h4 {
-            margin: 0 0 10px;
-            color: #333;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>Sistema de Información Geográfica - Municipalidad de Jesús María</h1>
+        <button id="menu-btn" onclick="toggleMenu()">☰ Menú</button>
+        <h1 style="font-size: 1.2rem; margin: 0;">SIG Jesús María</h1>
     </header>
 
     <div id="app-container">
         <aside id="layers-panel">
             <h4>Capas Disponibles</h4>
-            <input type="text" id="layer-search" placeholder="🔍 Buscar capas..." onkeyup="filtrarCapas()">
+            <input type="text" id="layer-search" placeholder="🔍 Buscar..." onkeyup="filtrarCapas()" style="width: 90%; padding: 8px; margin-bottom: 10px;">
             <div id="layer-list"></div>
         </aside>
 
@@ -89,20 +110,25 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const map = L.map('map', { zoomControl: true }).setView([-30.9764, -64.0957], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
+        // --- Configuración y Lógica igual a la anterior ---
         const geoserverUrl = 'http://192.168.0.52:8090/geoserver/GisJM/wms';
-
         const capasConfig = [
-            { id: 'GisJM:gestioncalleside', nombre: "Gestión de Calles", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:gestioncalleside', format: 'image/png', transparent: true, version: '1.1.0' }) },
-            { id: 'GisJM:mapinmtodosPGM', nombre: "Mapa de Inmuebles", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:mapinmtodosPGM', format: 'image/png', transparent: true, version: '1.1.0' }) },
-            { id: 'GisJM:usos_de_suelo_ord_4196', nombre: "Uso de Suelo", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:usos_de_suelo_ord_4196', format: 'image/png', transparent: true, version: '1.1.0' }) },
-            { id: 'GisJM:ejido2023', nombre: "Ejido 2023", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:ejido2023', format: 'image/png', transparent: true, version: '1.1.0' }) },
-            { id: 'GisJM:barriosjm1', nombre: "Barrios", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:barriosjm1', format: 'image/png', transparent: true, version: '1.1.0' }) },
-            { id: 'GisJM:idecor_manzanasweb', nombre: "Manzanas", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:idecor_manzanasweb', format: 'image/png', transparent: true, version: '1.1.0' }) },
-            { id: 'GisJM:red_agua', nombre: "Red de Agua", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:red_agua', format: 'image/png', transparent: true, version: '1.1.0' }) },
-            { id: 'GisJM:recorridobus', nombre: "Recorrido de Bus", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:recorridobus', format: 'image/png', transparent: true, version: '1.1.0' }) }
+            { id: 'GisJM:gestioncalleside', nombre: "Gestión de Calles" },
+            { id: 'GisJM:mapinmtodosPGM', nombre: "Mapa de Inmuebles" },
+            { id: 'GisJM:usos_de_suelo_ord_4196', nombre: "Uso de Suelo" },
+            { id: 'GisJM:ejido2023', nombre: "Ejido 2023" },
+            { id: 'GisJM:barriosjm1', nombre: "Barrios" },
+            { id: 'GisJM:idecor_manzanasweb', nombre: "Manzanas" },
+            { id: 'GisJM:red_agua', nombre: "Red de Agua" },
+            { id: 'GisJM:recorridobus', nombre: "Recorrido de Bus" }
         ];
+
+        // Crear instancias de capas
+        capasConfig.forEach(c => {
+            c.ref = L.tileLayer.wms(geoserverUrl, { layers: c.id, format: 'image/png', transparent: true, version: '1.1.0' });
+        });
 
         const container = document.getElementById('layer-list');
         capasConfig.forEach(c => {
@@ -116,6 +142,10 @@
             container.appendChild(div);
         });
 
+        function toggleMenu() {
+            document.getElementById('layers-panel').classList.toggle('active');
+        }
+
         function toggleLayer(id) {
             const capa = capasConfig.find(c => c.id === id);
             const checkbox = document.getElementById(`check-${id}`);
@@ -123,9 +153,7 @@
 
             if (checkbox.checked) {
                 capa.ref.addTo(map);
-                // Construir URL de la leyenda
-                const legendUrl = `${geoserverUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&WIDTH=20&HEIGHT=20&LAYER=${id}`;
-                legendDiv.innerHTML = `<img src="${legendUrl}" class="legend-img" alt="Leyenda">`;
+                legendDiv.innerHTML = `<img src="${geoserverUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&WIDTH=20&HEIGHT=20&LAYER=${id}" class="legend-img">`;
                 legendDiv.style.display = 'block';
             } else {
                 map.removeLayer(capa.ref);
