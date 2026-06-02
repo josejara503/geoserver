@@ -5,41 +5,6 @@
     <title>Sistema de Información Geográfica | Municipalidad de Jesús María</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-
-
-        #layers-panel {
-            width: 320px;
-            background: #ffffff;
-            border-right: 1px solid #ccc;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 1000;
-        }
-
-        #layer-search {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            box-sizing: border-box; /* Importante para que el padding no rompa el ancho */
-            font-size: 14px;
-        }
-
-        #layer-list {
-            overflow-y: auto; /* Permite scroll si hay muchas capas */
-            flex: 1;
-        }
-
-        .layer-item {
-            background: #f9f9f9;
-            padding: 12px;
-            margin-bottom: 8px;
-            border-radius: 6px;
-            border: 1px solid #eee;
-        }
-
         body {
             margin: 0;
             padding: 0;
@@ -63,19 +28,25 @@
             overflow: hidden;
         }
 
-        /* Panel Lateral de Capas */
         #layers-panel {
-            width: 300px;
+            width: 320px;
             background: #f4f4f4;
             border-right: 1px solid #ddd;
             padding: 15px;
             overflow-y: auto;
-            z-index: 1000;
         }
 
         #map {
             flex: 1;
             height: 100%;
+        }
+
+        #layer-search {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 10px;
         }
 
         .layer-item {
@@ -84,15 +55,13 @@
             margin-bottom: 10px;
             border-radius: 5px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            font-size: 0.9em;
         }
 
-        .legend {
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
-            max-width: 250px;
+        .legend-img {
+            display: block;
+            margin-top: 8px;
+            max-width: 100%;
+            border: 1px solid #eee;
         }
 
         h4 {
@@ -103,7 +72,6 @@
 </head>
 <body>
 
-    >
     <header>
         <h1>Sistema de Información Geográfica - Municipalidad de Jesús María</h1>
     </header>
@@ -112,7 +80,6 @@
         <aside id="layers-panel">
             <h4>Capas Disponibles</h4>
             <input type="text" id="layer-search" placeholder="🔍 Buscar capas..." onkeyup="filtrarCapas()">
-
             <div id="layer-list"></div>
         </aside>
 
@@ -126,82 +93,51 @@
 
         const geoserverUrl = 'http://192.168.0.52:8090/geoserver/GisJM/wms';
 
-        // Definición de capas
         const capasConfig = [
             { id: 'GisJM:gestioncalleside', nombre: "Gestión de Calles", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:gestioncalleside', format: 'image/png', transparent: true, version: '1.1.0' }) },
             { id: 'GisJM:mapinmtodosPGM', nombre: "Mapa de Inmuebles", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:mapinmtodosPGM', format: 'image/png', transparent: true, version: '1.1.0' }) },
             { id: 'GisJM:usos_de_suelo_ord_4196', nombre: "Uso de Suelo", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:usos_de_suelo_ord_4196', format: 'image/png', transparent: true, version: '1.1.0' }) },
             { id: 'GisJM:ejido2023', nombre: "Ejido 2023", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:ejido2023', format: 'image/png', transparent: true, version: '1.1.0' }) },
             { id: 'GisJM:barriosjm1', nombre: "Barrios", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:barriosjm1', format: 'image/png', transparent: true, version: '1.1.0' }) },
-            { id: 'GisJM:idecor_manzanasweb', nombre: "Manzanas", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:idecor_manzanasweb', format: 'image/png', transparent: true, version: '1.1.0' }) }
+            { id: 'GisJM:idecor_manzanasweb', nombre: "Manzanas", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:idecor_manzanasweb', format: 'image/png', transparent: true, version: '1.1.0' }) },
+            { id: 'GisJM:red_agua', nombre: "Red de Agua", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:red_agua', format: 'image/png', transparent: true, version: '1.1.0' }) },
+            { id: 'GisJM:recorridobus', nombre: "Recorrido de Bus", ref: L.tileLayer.wms(geoserverUrl, { layers: 'GisJM:recorridobus', format: 'image/png', transparent: true, version: '1.1.0' }) }
         ];
 
-        // Renderizar Panel
         const container = document.getElementById('layer-list');
         capasConfig.forEach(c => {
             const div = document.createElement('div');
             div.className = 'layer-item';
             div.innerHTML = `
-                            <input type="checkbox" id="${c.id}" onchange="toggleLayer('${c.id}')">
-                            <label for="${c.id}">${c.nombre}</label>
-                            <div id="controls-${c.id}" style="display:none; margin-top:5px;">
-                                <input type="range" min="0" max="1" step="0.1" value="1" oninput="c.ref.setOpacity(this.value)">
-                            </div>
-                        `;
+                    <input type="checkbox" id="check-${c.id}" onchange="toggleLayer('${c.id}')">
+                    <label for="check-${c.id}">${c.nombre}</label>
+                    <div id="legend-${c.id.replace(':', '-')}" style="display:none;"></div>
+                `;
             container.appendChild(div);
         });
 
         function toggleLayer(id) {
             const capa = capasConfig.find(c => c.id === id);
-            const checkbox = document.getElementById(id);
-            const controls = document.getElementById('controls-' + id);
+            const checkbox = document.getElementById(`check-${id}`);
+            const legendDiv = document.getElementById(`legend-${id.replace(':', '-')}`);
 
             if (checkbox.checked) {
                 capa.ref.addTo(map);
-                controls.style.display = 'block';
+                // Construir URL de la leyenda
+                const legendUrl = `${geoserverUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&WIDTH=20&HEIGHT=20&LAYER=${id}`;
+                legendDiv.innerHTML = `<img src="${legendUrl}" class="legend-img" alt="Leyenda">`;
+                legendDiv.style.display = 'block';
             } else {
                 map.removeLayer(capa.ref);
-                controls.style.display = 'none';
+                legendDiv.style.display = 'none';
             }
         }
 
-        // Lógica de Clic (GetFeatureInfo simplificada)
-        map.on('click', function (e) {
-            let queryLayers = capasConfig.filter(c => map.hasLayer(c.ref)).map(c => c.id);
-            if (queryLayers.length === 0) return;
-
-            const params = {
-                request: 'GetFeatureInfo', service: 'WMS', version: '1.1.0', format: 'image/png',
-                bbox: map.getBounds().toBBoxString(), height: map.getSize().y, width: map.getSize().x,
-                layers: queryLayers.join(','), query_layers: queryLayers.join(','), info_format: 'application/json',
-                x: Math.round(map.latLngToContainerPoint(e.latlng).x), y: Math.round(map.latLngToContainerPoint(e.latlng).y), srs: 'EPSG:4326'
-            };
-
-            fetch(geoserverUrl + L.Util.getParamString(params, geoserverUrl))
-                .then(res => res.json())
-                .then(data => {
-                    if (data.features?.length > 0) {
-                        let content = "<h4>Información</h4>";
-                        data.features.forEach(feat => {
-                            for (let key in feat.properties) content += `<b>${key}:</b> ${feat.properties[key]}<br>`;
-                        });
-                        L.popup().setLatLng(e.latlng).setContent(content).openOn(map);
-                    }
-                });
-        });
-
-
         function filtrarCapas() {
             const busqueda = document.getElementById('layer-search').value.toLowerCase();
-            const items = document.querySelectorAll('.layer-item');
-
-            items.forEach(item => {
+            document.querySelectorAll('.layer-item').forEach(item => {
                 const nombre = item.querySelector('label').innerText.toLowerCase();
-                if (nombre.includes(busqueda)) {
-                    item.style.display = 'block'; // Muestra si coincide
-                } else {
-                    item.style.display = 'none';  // Oculta si no coincide
-                }
+                item.style.display = nombre.includes(busqueda) ? 'block' : 'none';
             });
         }
     </script>
